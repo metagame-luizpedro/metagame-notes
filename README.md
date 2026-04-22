@@ -1,36 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Metagame Notes
 
-## Getting Started
+Collaborative player notes app for the Metagame team — voice-first note taking during poker sessions.
 
-First, run the development server:
+See [PRD.md](./PRD.md) for the full product spec.
+
+---
+
+## Tech stack
+
+- **Next.js 16** (App Router) + React 19 + TypeScript
+- **Tailwind CSS 4** + shadcn/ui + Lucide icons
+- **Zustand** for global state
+- **Supabase** (Postgres, Auth, Storage, Realtime) for the backend
+- **Vercel** for hosting
+
+---
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) 20+ (Node 24 recommended)
+- [pnpm](https://pnpm.io/installation) 10+
+- A [Supabase](https://supabase.com/) project
+- A [Vercel](https://vercel.com/) account (for deployment)
+- Git and GitHub CLI (`gh`) if you plan to push / deploy
+
+---
+
+## Local setup
+
+### 1. Clone and install
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/metagame-luizpedro/metagame-notes.git
+cd metagame-notes
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Configure environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Copy the template and fill in your Supabase project credentials:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.example .env.local
+```
 
-## Learn More
+Then edit `.env.local` with values from your Supabase project settings
+(**Project Settings → API**):
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Where to find it |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `anon` public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | `service_role` secret key (server-only — never commit) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`.env.local` is gitignored. Never commit it.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. Apply the database schema
 
-## Deploy on Vercel
+Open the Supabase dashboard → **SQL Editor** → **New query**, paste the contents
+of [`supabase/migrations/0001_initial_schema.sql`](./supabase/migrations/0001_initial_schema.sql),
+and run it. This creates all 7 tables, indexes, RLS policies, and the auto
+user-mirror trigger.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 4. Configure Auth URLs
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+In the Supabase dashboard → **Authentication → URL Configuration**:
+
+- **Site URL**: `http://localhost:3000` (for dev) or your production URL
+- **Redirect URLs**: add both `http://localhost:3000/**` and your production URL with `/**`
+
+Optionally, in **Authentication → Providers → Email**, disable *Confirm email*
+while developing so signups are immediate.
+
+### 5. Run the dev server
+
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Start the Next.js dev server |
+| `pnpm build` | Production build |
+| `pnpm start` | Serve the production build |
+| `pnpm lint` | Run ESLint |
+| `pnpm format` | Format all files with Prettier |
+| `pnpm format:check` | Check formatting without writing |
+
+---
+
+## Deploying
+
+The project deploys to Vercel. After linking via `vercel link`:
+
+1. Add the three environment variables from `.env.local` in **Project Settings → Environment Variables** (Production + Preview).
+2. Connect the GitHub repo in **Project Settings → Git** for auto-deploys on push to `main`.
+3. Run `vercel --prod` for the first manual deploy.
+4. Add the production URL to the Supabase **Site URL** and **Redirect URLs** (see step 4 above).
+
+---
+
+## Project structure
+
+```
+src/
+  app/
+    (auth)/           — login & signup pages, server actions
+    auth/signout/     — logout route handler
+    dashboard/        — authenticated landing page
+    layout.tsx        — root layout with Toaster
+    page.tsx          — redirects based on auth state
+  components/ui/      — shadcn/ui components
+  lib/
+    supabase/
+      client.ts       — browser Supabase client
+      server.ts       — server-side Supabase client
+      middleware.ts   — session-refresh helper used by proxy.ts
+    utils.ts          — shadcn cn() helper
+  proxy.ts            — Next.js 16 proxy (was middleware.ts) — auth gating
+supabase/
+  migrations/         — versioned SQL migrations
+```
+
+---
+
+## Credits
+
+Contributed by Luiz Pedro Andrade to the Metagame team. See [PRD.md §11](./PRD.md) for the ownership and handover model.
