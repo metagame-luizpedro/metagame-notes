@@ -34,11 +34,15 @@ const MAX_VISIBLE_TAGS = 3;
 
 type Props = {
   tagsByPlayer: Record<string, PlayerTag[]>;
+  // Quando a page passa um subset filtrado (ex: ?tag=X), usamos ele em vez
+  // do store global. Sem prop = comportamento default (mostra todos).
+  players?: Player[];
 };
 
-export function PlayerTable({ tagsByPlayer }: Props) {
+export function PlayerTable({ tagsByPlayer, players: playersProp }: Props) {
   const router = useRouter();
-  const players = useNicksStore((s) => s.players);
+  const storePlayers = useNicksStore((s) => s.players);
+  const players = playersProp ?? storePlayers;
   const removePlayer = useNicksStore((s) => s.removePlayer);
   const [confirmDelete, setConfirmDelete] = useState<Player | null>(null);
   const [pending, startTransition] = useTransition();

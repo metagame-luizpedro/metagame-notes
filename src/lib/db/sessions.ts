@@ -43,6 +43,24 @@ export async function endSession(supabase: SupabaseClient, sessionId: string): P
   return data;
 }
 
+// Stakes distintos usados pelo próprio user em sessions passadas (para picker
+// de filtros). No M3 single-user isso é suficiente — no M4 pode virar "do time
+// inteiro" se precisar.
+export async function listUserStakes(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("stake")
+    .eq("user_id", userId);
+
+  if (error) throw error;
+  const set = new Set<string>();
+  for (const r of data ?? []) set.add(r.stake as string);
+  return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
 export async function getActiveSession(
   supabase: SupabaseClient,
   userId: string,

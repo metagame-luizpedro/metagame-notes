@@ -46,7 +46,9 @@ export function NoteComposer({ onSaved }: Props) {
   const [engineState, setEngineState] = useState<VoiceEngineState>("idle");
   const [finalText, setFinalText] = useState("");
   const [interimText, setInterimText] = useState("");
-  const [visibility, setVisibility] = useState<NoteVisibility>("personal");
+  // Default "team": a maioria das notas tem valor compartilhado. Speech
+  // trigger "nota pessoal" ou o toggle manual ainda viram "personal".
+  const [visibility, setVisibility] = useState<NoteVisibility>("team");
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [manualEdit, setManualEdit] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -126,7 +128,7 @@ export function NoteComposer({ onSaved }: Props) {
     setEngineState("idle");
     setFinalText("");
     setInterimText("");
-    setVisibility("personal");
+    setVisibility("team");
     setSelectedPlayerIds([]);
     setManualEdit(false);
   }, []);
@@ -187,6 +189,40 @@ export function NoteComposer({ onSaved }: Props) {
     window.addEventListener("keydown", onKeydown);
     return () => window.removeEventListener("keydown", onKeydown);
   }, [hasText, busy, handleSave]);
+
+  // Atalho: Esc cancela. Universal — dispara mesmo com foco em textarea
+  // (diferente de Espaço/Enter, onde o guard é necessário pra não quebrar
+  // digitação). Esc em textarea = cancelar a nota inteira, não só blur.
+  //   - Gravando → para o mic e descarta o transcript (sem virar nota).
+  //   - Idle com texto → reset completo (volta ao zero).
+  //   - Idle sem texto → no-op.
+  //   - Ignora se há Dialog/AlertDialog/Popover do Radix aberto — deixa o
+  //     handler deles fechar o overlay em vez de resetar o composer por baixo.
+  useEffect(() => {
+    function hasRadixOverlayOpen(): boolean {
+      if (typeof document === "undefined") return false;
+      return !!document.querySelector(
+        '[data-state="open"][role="dialog"], [data-state="open"][role="alertdialog"], [data-radix-popper-content-wrapper]',
+      );
+    }
+    function onKeydown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (e.repeat) return;
+      if (hasRadixOverlayOpen()) return;
+
+      if (recording) {
+        e.preventDefault();
+        reset();
+        return;
+      }
+      if (hasText && !busy) {
+        e.preventDefault();
+        reset();
+      }
+    }
+    window.addEventListener("keydown", onKeydown);
+    return () => window.removeEventListener("keydown", onKeydown);
+  }, [recording, hasText, busy, reset]);
 
   return (
     <div className="relative space-y-5">

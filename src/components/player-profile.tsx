@@ -1,11 +1,26 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Lock, Users } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Lock, Pencil, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { NoteEditDialog } from "@/components/note-edit-dialog";
 import { createClient } from "@/lib/supabase/client";
-import { listNotesForPlayer, type NoteWithMentionsAndAuthor } from "@/lib/db/notes";
+import {
+  deleteNote,
+  listNotesForPlayer,
+  type NoteWithMentionsAndAuthor,
+} from "@/lib/db/notes";
 import { useUserStore } from "@/lib/store/user";
 import { cn } from "@/lib/utils";
 
@@ -54,10 +69,15 @@ function formatWhen(iso: string): string {
 export function PlayerProfile({ playerId, initialNotes }: Props) {
   const currentUser = useUserStore((s) => s.profile);
   const [tab, setTab] = useState<Tab>("all");
+  const [editing, setEditing] = useState<NoteWithMentionsAndAuthor | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // SSR populou `initialNotes` como optimistic first paint. Só marcamos
+  // `loaded` se veio algo — se veio vazio, o effect abaixo força refetch
+  // client-side (evita a aba ficar presa em [] se o RSC devolveu stale).
   const [state, setState] = useState<Record<Tab, TabState>>(() => ({
     all: {
       notes: initialNotes,
-      loaded: true,
+      loaded: initialNotes.length > 0,
       loading: false,
       hasMore: initialNotes.length >= PAGE_SIZE,
     },
@@ -107,13 +127,43 @@ export function PlayerProfile({ playerId, initialNotes }: Props) {
     [playerId, state],
   );
 
+  // Sync: sempre que a aba ativa não tem dados carregados, busca. Cobre tanto
+  // mount inicial (se SSR veio vazio na aba "all") quanto troca de aba.
+  // `state` sai de propósito das deps — só queremos reagir a mudança de tab;
+  // o guard evita disparo duplo quando o próprio load atualiza state.
+  useEffect(() => {
+    if (state[tab].loaded || state[tab].loading) return;
+    // Async IIFE pra evitar setState síncrono no effect body (lint rule).
+    void (async () => {
+      await loadPage(tab, true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, playerId]);
+
   const handleTabChange = (next: Tab) => {
     setTab(next);
-    // Lazy load: só busca a primeira página na primeira visita de cada aba.
-    if (!state[next].loaded && !state[next].loading) {
-      void loadPage(next, true);
-    }
   };
+
+  // Após editar/deletar, recarrega a aba ativa. Se a edição mudou a
+  // visibility da nota (ex: team → personal), ela pode sair de uma aba e
+  // entrar em outra — refetch cobre isso.
+  const refreshActiveTab = useCallback(() => {
+    void loadPage(tab, true);
+  }, [tab, loadPage]);
+
+  async function handleDelete() {
+    if (!deletingId) return;
+    try {
+      const supabase = createClient();
+      await deleteNote(supabase, deletingId);
+      toast.success("Nota apagada.");
+      setDeletingId(null);
+      refreshActiveTab();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao apagar.";
+      toast.error(message);
+    }
+  }
 
   const active = state[tab];
 
@@ -155,7 +205,10 @@ export function PlayerProfile({ playerId, initialNotes }: Props) {
               : note.author?.name ?? "Membro do time";
 
             return (
-              <li key={note.id} className="border-border flex gap-3 rounded-lg border p-3">
+              <li
+                key={note.id}
+                className="border-border group flex gap-3 rounded-lg border p-3"
+              >
                 <div
                   className={cn(
                     "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
@@ -193,6 +246,32 @@ export function PlayerProfile({ playerId, initialNotes }: Props) {
                     </span>
                   </div>
                 </div>
+
+                {/* Botões só aparecem pro autor — RLS ainda bloqueia no backend. */}
+                {isOwnAuthor && (
+                  <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label="Editar nota"
+                      onClick={() => setEditing(note)}
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive h-8 w-8"
+                      aria-label="Apagar nota"
+                      onClick={() => setDeletingId(note.id)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                )}
               </li>
             );
           })}
@@ -216,6 +295,30 @@ export function PlayerProfile({ playerId, initialNotes }: Props) {
       {!active.loaded && active.loading && (
         <div className="text-muted-foreground py-8 text-center text-sm">Carregando notas…</div>
       )}
+
+      <NoteEditDialog
+        note={editing}
+        open={!!editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        onSaved={refreshActiveTab}
+      />
+
+      <AlertDialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar nota?</AlertDialogTitle>
+            <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete}>
+              Apagar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

@@ -61,6 +61,15 @@ export async function listGlobalCustomTags(supabase: SupabaseClient): Promise<st
   return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
+// Todas as tags distinct (oficiais + custom), para picker de filtros.
+export async function listAllDistinctTags(supabase: SupabaseClient): Promise<string[]> {
+  const { data, error } = await supabase.from("player_tags").select("tag");
+  if (error) throw error;
+  const set = new Set<string>();
+  for (const r of data ?? []) set.add(r.tag as string);
+  return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
 export type AddPlayerTagInput = {
   playerId: string;
   tag: string;
