@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +26,14 @@ import type { NoteVisibility } from "@/lib/types";
 type Props = {
   onSaved?: () => void;
 };
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  if (tag === "input" || tag === "textarea" || tag === "select") return true;
+  if (target.isContentEditable) return true;
+  return false;
+}
 
 export function NoteComposer({ onSaved }: Props) {
   const profile = useUserStore((s) => s.profile);
@@ -110,7 +118,7 @@ export function NoteComposer({ onSaved }: Props) {
     else void startRecording();
   }, [recording, transcribing, startRecording, stopRecording]);
 
-  function reset() {
+  const reset = useCallback(() => {
     engineRef.current?.abort();
     engineRef.current = null;
     setEngineState("idle");
@@ -119,9 +127,9 @@ export function NoteComposer({ onSaved }: Props) {
     setVisibility("personal");
     setSelectedPlayerIds([]);
     setManualEdit(false);
-  }
+  }, []);
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     if (!profile) {
       toast.error("Perfil não carregado.");
       return;
@@ -155,9 +163,27 @@ export function NoteComposer({ onSaved }: Props) {
     } finally {
       setSaving(false);
     }
-  }
+  }, [profile, busy, finalText, interimText, visibility, selectedPlayerIds, onSaved, reset]);
 
   const hasText = (finalText + interimText).trim().length > 0;
+
+  // Atalho: Enter salva a nota. Regras:
+  //   - ignora Shift+Enter (reservado pra quebra de linha / futuras features)
+  //   - ignora se o foco está em input/textarea/contenteditable (default do browser)
+  //   - só dispara quando há texto E o composer está idle (não gravando/transcrevendo/salvando)
+  useEffect(() => {
+    function onKeydown(e: KeyboardEvent) {
+      if (e.key !== "Enter") return;
+      if (e.shiftKey) return;
+      if (e.repeat) return;
+      if (isEditableTarget(e.target)) return;
+      if (!hasText || busy) return;
+      e.preventDefault();
+      void handleSave();
+    }
+    window.addEventListener("keydown", onKeydown);
+    return () => window.removeEventListener("keydown", onKeydown);
+  }, [hasText, busy, handleSave]);
 
   return (
     <div className="relative space-y-5">
@@ -175,7 +201,8 @@ export function NoteComposer({ onSaved }: Props) {
         <div className="flex flex-col gap-1">
           <VisibilityToggle value={visibility} onChange={setVisibility} />
           <p className="text-muted-foreground text-xs">
-            Atalho: <kbd className="bg-muted rounded px-1.5 py-0.5">Espaço</kbd> liga/desliga o mic.
+            Atalho: <kbd className="bg-muted rounded px-1.5 py-0.5">Espaço</kbd> liga/desliga o
+            mic, <kbd className="bg-muted rounded px-1.5 py-0.5">Enter</kbd> salva a nota.
           </p>
           {transcribing && (
             <p className="text-muted-foreground text-xs">Transcrevendo áudio…</p>
