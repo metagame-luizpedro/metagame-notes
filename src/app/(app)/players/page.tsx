@@ -2,8 +2,18 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlayerForm } from "@/components/player-form";
 import { PlayerTable } from "@/components/player-table";
+import { createClient } from "@/lib/supabase/server";
+import { listPlayers } from "@/lib/db/players";
+import { listTagsForPlayers } from "@/lib/db/player-tags";
 
-export default function PlayersPage() {
+export default async function PlayersPage() {
+  const supabase = await createClient();
+  const players = await listPlayers(supabase);
+  const tagsByPlayer = await listTagsForPlayers(
+    supabase,
+    players.map((p) => p.id),
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -23,7 +33,7 @@ export default function PlayersPage() {
         />
       </div>
 
-      <PlayerTable />
+      <PlayerTable tagsByPlayer={tagsByPlayer} />
     </div>
   );
 }

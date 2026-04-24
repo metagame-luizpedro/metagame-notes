@@ -23,13 +23,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PlayerForm } from "@/components/player-form";
+import { TagChip } from "@/components/player-tags-manager";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { deletePlayer } from "@/lib/db/players";
 import { useNicksStore } from "@/lib/store/nicks";
-import type { Player } from "@/lib/types";
+import type { Player, PlayerTag } from "@/lib/types";
 
-export function PlayerTable() {
+const MAX_VISIBLE_TAGS = 3;
+
+type Props = {
+  tagsByPlayer: Record<string, PlayerTag[]>;
+};
+
+export function PlayerTable({ tagsByPlayer }: Props) {
   const router = useRouter();
   const players = useNicksStore((s) => s.players);
   const removePlayer = useNicksStore((s) => s.removePlayer);
@@ -73,13 +80,27 @@ export function PlayerTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {players.map((p) => (
+            {players.map((p) => {
+              const tags = tagsByPlayer[p.id] ?? [];
+              const visible = tags.slice(0, MAX_VISIBLE_TAGS);
+              const hidden = tags.length - visible.length;
+              return (
               <TableRow
                 key={p.id}
                 onClick={() => router.push(`/players/${p.id}`)}
                 className="hover:bg-muted/50 cursor-pointer"
               >
-                <TableCell className="font-medium">{p.nick}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <span>{p.nick}</span>
+                    {visible.map((t) => (
+                      <TagChip key={t.id} tag={t} compact />
+                    ))}
+                    {hidden > 0 && (
+                      <span className="text-muted-foreground text-[10px]">+{hidden}</span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {new Date(p.created_at).toLocaleDateString("pt-BR")}
                 </TableCell>
@@ -104,7 +125,8 @@ export function PlayerTable() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
