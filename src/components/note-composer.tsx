@@ -13,6 +13,7 @@ import { detectVisibilityTrigger } from "@/lib/speech/triggers";
 import { createClient } from "@/lib/supabase/client";
 import { createNoteWithMentions } from "@/lib/db/notes";
 import { useNicksStore } from "@/lib/store/nicks";
+import { useSessionStore } from "@/lib/store/session";
 import { useUserStore } from "@/lib/store/user";
 import { useVoiceEngineStore } from "@/lib/store/voice-engine";
 import {
@@ -40,6 +41,7 @@ export function NoteComposer({ onSaved }: Props) {
   const players = useNicksStore((s) => s.players);
   const knownNicks = useNicksStore((s) => s.nicks);
   const engineKind = useVoiceEngineStore((s) => s.kind);
+  const activeSession = useSessionStore((s) => s.active);
 
   const [engineState, setEngineState] = useState<VoiceEngineState>("idle");
   const [finalText, setFinalText] = useState("");
@@ -153,6 +155,7 @@ export function NoteComposer({ onSaved }: Props) {
         visibility,
         content,
         playerIds: selectedPlayerIds,
+        sessionId: activeSession?.id ?? null,
       });
       toast.success("Nota salva.");
       reset();
@@ -163,7 +166,7 @@ export function NoteComposer({ onSaved }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [profile, busy, finalText, interimText, visibility, selectedPlayerIds, onSaved, reset]);
+  }, [profile, busy, finalText, interimText, visibility, selectedPlayerIds, activeSession, onSaved, reset]);
 
   const hasText = (finalText + interimText).trim().length > 0;
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { SessionBadge } from "@/components/session-badge";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -46,6 +47,7 @@ export function AppNav({ userName }: Props) {
         </div>
 
         <div className="flex items-center gap-3">
+          <SessionBadge />
           <span className="text-muted-foreground hidden text-sm sm:inline">{userName}</span>
           <form action="/auth/signout" method="post">
             <Button type="submit" variant="outline" size="sm">

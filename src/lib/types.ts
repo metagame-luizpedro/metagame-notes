@@ -30,3 +30,13 @@ export type UserProfile = {
   wpt_nicks: string[];
   avatar_url: string | null;
 };
+
+export type Session = {
+  id: string;
+  user_id: string;
+  stake: string;
+  tables: string[];
+  started_at: string;
+  ended_at: string | null;
+  created_at: string;
+};
