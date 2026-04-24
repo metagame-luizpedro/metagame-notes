@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import {
   Table,
@@ -29,6 +30,7 @@ import { useNicksStore } from "@/lib/store/nicks";
 import type { Player } from "@/lib/types";
 
 export function PlayerTable() {
+  const router = useRouter();
   const players = useNicksStore((s) => s.players);
   const removePlayer = useNicksStore((s) => s.removePlayer);
   const [confirmDelete, setConfirmDelete] = useState<Player | null>(null);
@@ -72,12 +74,16 @@ export function PlayerTable() {
           </TableHeader>
           <TableBody>
             {players.map((p) => (
-              <TableRow key={p.id}>
+              <TableRow
+                key={p.id}
+                onClick={() => router.push(`/players/${p.id}`)}
+                className="hover:bg-muted/50 cursor-pointer"
+              >
                 <TableCell className="font-medium">{p.nick}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {new Date(p.created_at).toLocaleDateString("pt-BR")}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-end gap-1">
                     <PlayerForm
                       player={p}

@@ -14,6 +14,20 @@ export async function listPlayers(supabase: SupabaseClient): Promise<Player[]> {
   return data ?? [];
 }
 
+export async function getPlayerById(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<Player | null> {
+  const { data, error } = await supabase
+    .from("players")
+    .select("id, nick, created_by, created_at, updated_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function createPlayer(supabase: SupabaseClient, nick: string): Promise<Player> {
   const { data, error } = await supabase
     .from("players")
