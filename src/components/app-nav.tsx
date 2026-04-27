@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { SessionBadge } from "@/components/session-badge";
 import { GlobalSearchTrigger } from "@/components/global-search-trigger";
+import { useUserStore } from "@/lib/store/user";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -21,6 +22,10 @@ const LINKS = [
 
 export function AppNav({ userName, allTags, userStakes }: Props) {
   const pathname = usePathname();
+  const isAdmin = useUserStore((s) => s.profile?.role === "admin");
+  const navLinks = isAdmin
+    ? [...LINKS, { href: "/admin", label: "Admin" }]
+    : LINKS;
 
   return (
     <header className="border-border bg-background sticky top-0 z-10 border-b">
@@ -30,7 +35,7 @@ export function AppNav({ userName, allTags, userStakes }: Props) {
             Metagame Notes
           </Link>
           <nav className="flex items-center gap-1">
-            {LINKS.map((link) => {
+            {navLinks.map((link) => {
               const active = pathname === link.href || pathname.startsWith(link.href + "/");
               return (
                 <Link
