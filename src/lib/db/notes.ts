@@ -102,19 +102,41 @@ export type NoteWithMentions = Note & {
   mentions: { player_id: string; nick: string }[];
 };
 
-export type NoteAuthor = { id: string; name: string };
+export type NoteAuthor = { id: string; name: string; avatar_url: string | null };
 
 export type NoteWithMentionsAndAuthor = NoteWithMentions & {
-  author: NoteAuthor | null;
+  author: NoteAuthor;
 };
 
-// Lista notas que mencionam um jogador, respeitando RLS (personal do próprio
-// user + team de qualquer um). `visibility` filtra quando quisermos só uma aba.
-//
-// Nota sobre autor em notas team: o RLS em public.users só libera o próprio
-// registro (users_select_self_or_admin). Em M3 single-user isso é suficiente —
-// autor de notas team é sempre o próprio user. No M4 multi-user vamos abrir
-// leitura básica (id, name) de outros users pra desbloquear isso.
+// Busca em batch perfis públicos (id, name, avatar_url) via view
+// `public_user_profiles`. A view bypassa a RLS apertada de public.users e
+// expõe só campos não-sensíveis pra qualquer authenticated. Centralizar aqui
+// evita N+1 e garante embed consistente em qualquer feed multi-user.
+export async function fetchAuthorsByIds(
+  supabase: SupabaseClient,
+  authorIds: string[],
+): Promise<Map<string, NoteAuthor>> {
+  const ids = Array.from(new Set(authorIds.filter(Boolean)));
+  if (!ids.length) return new Map();
+
+  const { data, error } = await supabase
+    .from("public_user_profiles")
+    .select("id, name, avatar_url")
+    .in("id", ids);
+
+  if (error) throw error;
+
+  const map = new Map<string, NoteAuthor>();
+  for (const row of data ?? []) {
+    map.set(row.id as string, {
+      id: row.id as string,
+      name: (row.name as string) ?? "",
+      avatar_url: (row.avatar_url as string | null) ?? null,
+    });
+  }
+  return map;
+}
+
 type ListNotesForPlayerFilter = "all" | "team" | "personal";
 
 export async function listNotesForPlayer(
@@ -136,7 +158,9 @@ export async function listNotesForPlayer(
   const noteIds = Array.from(new Set((mentionRows ?? []).map((r) => r.note_id as string)));
   if (!noteIds.length) return [];
 
-  // 2) Notas com TODOS os mentions + autor (embed falha gracioso se RLS bloquear).
+  // 2) Notas com mentions. Autor vem em fetch separado via view (passo 3) —
+  // PostgREST não embed views por FK virtual sem hint manual, e duas queries
+  // são mais previsíveis que configurar relationship overrides.
   let query = supabase
     .from("notes")
     .select(
@@ -145,8 +169,7 @@ export async function listNotesForPlayer(
       note_player_mentions (
         player_id,
         players ( nick )
-      ),
-      author:author_id ( id, name )
+      )
     `,
     )
     .in("id", noteIds)
@@ -160,7 +183,11 @@ export async function listNotesForPlayer(
   const { data, error } = await query;
   if (error) throw error;
 
-  return (data ?? []).map((row) => {
+  const rows = data ?? [];
+  const authorIds = rows.map((r) => r.author_id as string);
+  const authors = await fetchAuthorsByIds(supabase, authorIds);
+
+  return rows.map((row) => {
     const mentionsRaw = (row.note_player_mentions ?? []) as Array<{
       player_id: string;
       players: { nick: string } | { nick: string }[] | null;
@@ -170,11 +197,11 @@ export async function listNotesForPlayer(
       return { player_id: m.player_id, nick: player?.nick ?? "" };
     });
 
-    const authorRaw = row.author as
-      | { id: string; name: string }
-      | { id: string; name: string }[]
-      | null;
-    const author = Array.isArray(authorRaw) ? (authorRaw[0] ?? null) : authorRaw;
+    const author = authors.get(row.author_id as string) ?? {
+      id: row.author_id as string,
+      name: "",
+      avatar_url: null,
+    };
 
     return {
       id: row.id,

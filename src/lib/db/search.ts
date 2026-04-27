@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Player } from "@/lib/types";
-import type { NoteWithMentionsAndAuthor } from "@/lib/db/notes";
+import { fetchAuthorsByIds, type NoteWithMentionsAndAuthor } from "@/lib/db/notes";
 
 export type SearchNoteFilters = {
   q?: string;
@@ -94,8 +94,7 @@ export async function searchNotes(
       note_player_mentions (
         player_id,
         players ( nick )
-      ),
-      author:author_id ( id, name )
+      )
     `,
     )
     .in("id", ids)
@@ -103,7 +102,13 @@ export async function searchNotes(
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => {
+  const rows = data ?? [];
+  const authors = await fetchAuthorsByIds(
+    supabase,
+    rows.map((r) => r.author_id as string),
+  );
+
+  return rows.map((row) => {
     const mentionsRaw = (row.note_player_mentions ?? []) as Array<{
       player_id: string;
       players: { nick: string } | { nick: string }[] | null;
@@ -112,11 +117,11 @@ export async function searchNotes(
       const player = Array.isArray(m.players) ? m.players[0] : m.players;
       return { player_id: m.player_id, nick: player?.nick ?? "" };
     });
-    const authorRaw = row.author as
-      | { id: string; name: string }
-      | { id: string; name: string }[]
-      | null;
-    const author = Array.isArray(authorRaw) ? (authorRaw[0] ?? null) : authorRaw;
+    const author = authors.get(row.author_id as string) ?? {
+      id: row.author_id as string,
+      name: "",
+      avatar_url: null,
+    };
 
     return {
       id: row.id,

@@ -202,7 +202,7 @@ export function PlayerProfile({ playerId, initialNotes }: Props) {
             const isOwnAuthor = note.author_id === currentUser?.id;
             const authorLabel = isOwnAuthor
               ? currentUser?.name ?? "Você"
-              : note.author?.name ?? "Membro do time";
+              : note.author.name;
 
             return (
               <li

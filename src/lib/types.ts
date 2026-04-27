@@ -14,7 +14,7 @@ export type Player = {
 
 export type Note = {
   id: string;
-  author_id: string | null;
+  author_id: string;
   session_id: string | null;
   visibility: NoteVisibility;
   content: string;
