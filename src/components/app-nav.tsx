@@ -15,6 +15,7 @@ type Props = {
 
 const LINKS = [
   { href: "/dashboard", label: "Capturar" },
+  { href: "/feed", label: "Feed" },
   { href: "/players", label: "Jogadores" },
 ];
 
