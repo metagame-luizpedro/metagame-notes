@@ -19,6 +19,28 @@ export async function signIn(formData: FormData) {
   redirect("/dashboard");
 }
 
+export async function sendMagicLink(formData: FormData) {
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!email) {
+    redirect(`/login?error=${encodeURIComponent("Email obrigatório.")}`);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: false },
+  });
+
+  if (error) {
+    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect(`/login?sent=1`);
+}
+
 export async function signUp(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");

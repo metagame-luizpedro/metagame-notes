@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { signIn } from "../actions";
+import { sendMagicLink, signIn } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Props = {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; sent?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: Props) {
-  const { error } = await searchParams;
+  const { error, sent } = await searchParams;
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
@@ -17,6 +17,15 @@ export default async function LoginPage({ searchParams }: Props) {
           <h1 className="text-2xl font-bold">Metagame Notes</h1>
           <p className="text-muted-foreground text-sm">Entre na sua conta</p>
         </div>
+
+        {sent && (
+          <p
+            className="rounded-md border border-green-600/40 bg-green-600/10 p-3 text-center text-sm text-green-700 dark:text-green-400"
+            role="status"
+          >
+            Link enviado pro seu email. Cheque a caixa de entrada.
+          </p>
+        )}
 
         <form action={signIn} className="space-y-4">
           <div className="space-y-2">
@@ -47,6 +56,31 @@ export default async function LoginPage({ searchParams }: Props) {
 
           <Button type="submit" className="w-full">
             Entrar
+          </Button>
+        </form>
+
+        <div className="flex items-center gap-3">
+          <span className="bg-border h-px flex-1" />
+          <span className="text-muted-foreground text-xs uppercase tracking-wide">ou</span>
+          <span className="bg-border h-px flex-1" />
+        </div>
+
+        <form action={sendMagicLink} className="space-y-3">
+          <div className="space-y-2">
+            <label htmlFor="magic-email" className="text-sm font-medium">
+              Esqueci a senha / primeiro acesso
+            </label>
+            <Input
+              id="magic-email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="seu@email.com"
+            />
+          </div>
+          <Button type="submit" variant="outline" className="w-full">
+            Receber link de acesso por email
           </Button>
         </form>
 
